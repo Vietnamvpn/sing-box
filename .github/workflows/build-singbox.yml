@@ -55,7 +55,7 @@ jobs:
           if [ -z "$TARGET_TAG" ]; then
             TARGET_TAG="${{ inputs.tag }}"
           fi
-          [ -z "$TARGET_TAG" ] && TARGET_TAG="v1.13.14"
+          [ -z "$TARGET_TAG" ] && TARGET_TAG="v1.13.15"
 
           # Thêm cờ -X để gán phiên bản vào hằng số của sing-box
           CGO_ENABLED=0 GOOS=linux GOARCH=${{ matrix.goarch }} go build -v -trimpath -ldflags "-s -w -X github.com/sagernet/sing-box/constant.Version=$TARGET_TAG" -tags "with_v2ray_api,with_quic,with_grpc,with_clash_api,with_utls" ./cmd/sing-box
