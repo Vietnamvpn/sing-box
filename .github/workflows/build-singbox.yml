@@ -4,6 +4,14 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag hoặc branch cần build (vd: v1.11.4 hoặc main)'
+        required: false
+        default: 'main'
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -21,15 +29,21 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.23'
 
       - name: Clone and Checkout Sing-box
         run: |
           git clone https://github.com/SagerNet/sing-box.git
           cd sing-box
-          TAG="${{ github.event.release.tag_name }}"
-          if [ -n "$TAG" ]; then
-            git checkout "$TAG" || echo "Tag not found, using latest main"
+          
+          # Lấy tag từ GitHub Release hoặc từ manual input
+          TARGET_TAG="${{ github.event.release.tag_name }}"
+          if [ -z "$TARGET_TAG" ]; then
+            TARGET_TAG="${{ inputs.tag }}"
+          fi
+          
+          if [ -n "$TARGET_TAG" ] && [ "$TARGET_TAG" != "main" ]; then
+            git checkout "$TARGET_TAG" || echo "Không tìm thấy tag, sử dụng nhánh main mới nhất"
           fi
 
       - name: Build Binary
@@ -55,9 +69,19 @@ jobs:
         with:
           path: downloaded-binaries
 
+      - name: Get Release Tag
+        id: get_tag
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          if [ -z "$TAG" ]; then
+            TAG="${{ inputs.tag }}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
       - name: Upload binaries to Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.get_tag.outputs.tag }}
           files: |
             downloaded-binaries/sing-box-linux-amd64/sing-box-linux-amd64
             downloaded-binaries/sing-box-linux-arm64/sing-box-linux-arm64
