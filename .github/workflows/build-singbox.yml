@@ -1,0 +1,65 @@
+name: Build and Release Custom Sing-box
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            goarch: amd64
+          - arch: arm64
+            goarch: arm64
+
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Clone and Checkout Sing-box
+        run: |
+          git clone https://github.com/SagerNet/sing-box.git
+          cd sing-box
+          TAG="${{ github.event.release.tag_name }}"
+          if [ -n "$TAG" ]; then
+            git checkout "$TAG" || echo "Tag not found, using latest main"
+          fi
+
+      - name: Build Binary
+        run: |
+          cd sing-box
+          CGO_ENABLED=0 GOOS=linux GOARCH=${{ matrix.goarch }} go build -v -trimpath -ldflags "-s -w" -tags "with_v2ray_api,with_quic,with_grpc,with_clash_api,with_reality_server" ./cmd/sing-box
+          mkdir -p ../binaries
+          mv sing-box ../binaries/sing-box-linux-${{ matrix.arch }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sing-box-linux-${{ matrix.arch }}
+          path: binaries/sing-box-linux-${{ matrix.arch }}
+
+  release:
+    needs: build
+    name: Upload to Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded-binaries
+
+      - name: Upload binaries to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            downloaded-binaries/sing-box-linux-amd64/sing-box-linux-amd64
+            downloaded-binaries/sing-box-linux-arm64/sing-box-linux-arm64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
